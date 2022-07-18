@@ -1,11 +1,21 @@
-# event-sourcing
+# Event Sourcing - NodeJS + Typescript
 
-This library was generated with [Nx](https://nx.dev).
+> This library is intended to be a lean dev-experience oriented implementation for event sourcing techniques.
+> 
+> In general, the goal of this library will be to implement the general aspects of this development philosophy with an intuitive and declarative interface that hides the complexity of the infrastructure but opens allows customization and extensibility.
 
-## Running unit tests
+## Core Feature Modules
 
-Run `nx test event-sourcing` to execute the unit tests via [Jest](https://jestjs.io).
+### Aggregate Artisan
+> Set of tools designed for defining business entities that can process Business Events and enclose the Business Logic Representation within.
+> 
+> The main aspect of this design, is that the Aggregate is responsible for defining whether an action can be performed or not on a given state derived from previous events.
 
-## Running lint
+### Event Artisan
+> Set of tools designed for generating Versioned Business Events. 
+> 
+> This design will follow the principles of Upcastable Events for handling different version of events without adding code complexity and avoiding unnecessary efforts on maintenance.
 
-Run `nx lint event-sourcing` to execute the lint via [ESLint](https://eslint.org/).
+### Projector
+> The projector will expose features for managing collections with states derived from stored business events, using checkpoints as a performance optimization.
+> 
