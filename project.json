@@ -1,0 +1,34 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/event-sourcing/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/event-sourcing/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["coverage/libs/event-sourcing"],
+      "options": {
+        "jestConfig": "libs/event-sourcing/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "build": {
+      "executor": "@nrwl/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/event-sourcing",
+        "tsConfig": "libs/event-sourcing/tsconfig.lib.json",
+        "packageJson": "libs/event-sourcing/package.json",
+        "main": "libs/event-sourcing/src/index.ts",
+        "assets": ["libs/event-sourcing/*.md"]
+      }
+    }
+  },
+  "tags": []
+}
