@@ -11,6 +11,10 @@ export default {
   transform: {
     '^.+\\.[tj]sx?$': 'ts-jest',
   },
+  transformIgnorePatterns: [
+    "node_modules/(?!lodash-es)"
+  ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/libs/event-sourcing',
+  setupFilesAfterEnv: ["./src/setup.ts"]
 };

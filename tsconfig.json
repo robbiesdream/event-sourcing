@@ -1,7 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
-  "files": [],
+  "files": ["./src/setup.ts"],
   "include": [],
+  "compilerOptions": {
+    "types": ["reflect-metadata"]
+  },
   "references": [
     {
       "path": "./tsconfig.lib.json"
