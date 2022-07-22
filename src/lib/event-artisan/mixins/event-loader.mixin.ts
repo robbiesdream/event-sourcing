@@ -21,7 +21,7 @@ export class EventLoader implements StoredEvent<unknown, unknown> {
     this.createdAt = event.createdAt
   }
 
-  fromRawData<Data, Meta>(data: Data, meta: Meta) {
+  fromRawData<Data = unknown, Meta = EmptyObject>(data: Data, meta: Meta) {
     this.data = data
     this.meta = meta
   }

@@ -1,34 +1,44 @@
-import {EventCraftingManifest} from "./event.types";
+import {EventCraftingManifest, Upcaster} from "./event.types";
 import {SourceEvent} from "./source-event.class";
 import {Type} from "@doesrobbiedream/ts-utils";
 
 export enum EventDecoratedKeys {
   Type = 'Type',
-  Version = 'Version'
+  Version = 'Version',
+  Target = 'Target',
+  IsLegacy = 'IsLegacy'
 }
 
-export function EventDecoratorFactory(manifest: EventCraftingManifest){
-  return function (target: Type<SourceEvent<unknown, unknown>>){
+export function EventDecoratorFactory(manifest: EventCraftingManifest) {
+  return function (target: Type<SourceEvent<unknown, unknown>>) {
     Reflect.defineMetadata(EventDecoratedKeys.Type, manifest.type, target)
     Reflect.defineMetadata(EventDecoratedKeys.Version, manifest.version, target)
   }
 }
 
-export function LockedPropertyOntoMetadata(metadataKey: string){
+export function LegacyEventDecoratorFactory(upcaster: Type<Upcaster>) {
+  return function (target: Type<SourceEvent<unknown, unknown>>) {
+    Reflect.defineMetadata(EventDecoratedKeys.Target, upcaster, target)
+    Reflect.defineMetadata(EventDecoratedKeys.IsLegacy, true, target)
+  }
+}
+
+export function LockedPropertyOntoMetadata(metadataKey: string) {
   return (target, propertyKey) => {
     const propertyLocker = propertyLockerOntoReflectedFactory(target)
     propertyLocker.lock(propertyKey, metadataKey)
   }
 }
+
 function propertyLockerOntoReflectedFactory(target: Type<SourceEvent>) {
   return {
     lock: (propertyKey: string, metadataKey: string) => {
 
       const descriptor = {
-        get: function(){
+        get: function () {
           return Reflect.getMetadata(metadataKey, this.constructor)
         },
-        set: function (){
+        set: function () {
           throw Error('Event version cannot be updated.')
         },
         enumerable: true

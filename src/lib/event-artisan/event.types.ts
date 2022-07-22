@@ -14,8 +14,8 @@ export interface StoredEventContents<Data, Meta> {
   meta: Meta
 }
 
-export interface Upcaster<L, T> {
-  upcast(event: L): T
+export interface Upcaster<L = unknown> {
+  upcast(event: L): this
 }
 
 export type StoredEvent<Data, Meta = EmptyObject> =
@@ -27,7 +27,7 @@ export interface EventCraftingManifest {
   version: number
 }
 
-export interface LegacyEventCraftingManifest<Legacy, Target> {
+export interface LegacyEventCraftingManifest {
   version: number
-  target: Upcaster<Legacy, Target>
+  target: Upcaster
 }
