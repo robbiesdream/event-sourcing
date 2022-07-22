@@ -18,6 +18,5 @@ export class SourceEvent<Data = UnknownObject, Meta = EmptyObject> extends Mixin
 
   constructor() {
     super();
-    this.fromRawData(this.data, this.meta)
   }
 }
