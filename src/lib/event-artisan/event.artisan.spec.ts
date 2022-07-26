@@ -1,7 +1,6 @@
 import {EventArtisan} from "./event.artisan";
 import {SourceEvent} from "./source-event.class";
 import {EmptyObject, StoredEvent, Upcaster} from "./event.types";
-import {LiftingNonLegacyEventException} from "./exceptions/lifting-non-legacy-event.exception";
 
 describe(EventArtisan.name, () => {
 
@@ -70,7 +69,7 @@ describe(EventArtisan.name, () => {
         latestEvent = new MyFirstTestEventV2()
       })
       it('should throw an error when lifting', function () {
-        expect(() => latestEvent.lift()).toThrowError(LiftingNonLegacyEventException)
+        expect(latestEvent.lift()).toBeInstanceOf(MyFirstTestEventV2)
       });
     })
   });

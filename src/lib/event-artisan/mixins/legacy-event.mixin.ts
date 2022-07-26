@@ -1,7 +1,6 @@
 import {MixinArtisan, Type} from "@doesrobbiedream/ts-utils";
 import {Upcaster} from "../event.types";
 import {EventDecoratedKeys} from "../event.decorators";
-import {LiftingNonLegacyEventException} from "../exceptions/lifting-non-legacy-event.exception";
 
 export class LegacyEvent {
   public static isLegacy(event: unknown): event is LegacyEvent {
@@ -10,7 +9,7 @@ export class LegacyEvent {
 
   public lift(upcastToVersion?: number) {
     if (!LegacyEvent.isLegacy(this)) {
-      throw new LiftingNonLegacyEventException()
+      return this
     }
 
     const targetConstructor: Type<Upcaster<this>> = Reflect.getMetadata(EventDecoratedKeys.Target, this.constructor)

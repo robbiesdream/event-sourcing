@@ -18,16 +18,11 @@ export interface Upcaster<L = unknown> {
   upcast(event: L): this
 }
 
-export type StoredEvent<Data, Meta = EmptyObject> =
+export type StoredEvent<Data = unknown, Meta = unknown> =
   StoredEventBaseData
   & StoredEventContents<Data, Meta>
 
 export interface EventCraftingManifest {
   type: string
   version: number
-}
-
-export interface LegacyEventCraftingManifest {
-  version: number
-  target: Upcaster
 }

@@ -1,1 +1,1 @@
-export * from './event-artisan'
+export * from './events'
