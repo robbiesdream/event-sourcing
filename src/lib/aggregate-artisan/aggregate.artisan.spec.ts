@@ -11,8 +11,8 @@ describe('', function () {
     beforeEach(() => {
       aggregate = new MyAggregate()
       events = [
-        createEventFromData<EventV1>('MyTestEvent', 1, {word: 'from Spain'}, {}),
-        createEventFromData<EventV2>('MyTestEvent', 2, {word: 'Hello', position: 0}, {}),
+        createEventFromData<EventV1>('MyTestEvent', 1, {word: 'Hello'}, {}),
+        createEventFromData<EventV1>('MyTestEvent', 1, {word: 'from Spain!'}, {}),
         createEventFromData<EventV2>('MyTestEvent', 2, {word: 'World', position: 1}, {})
       ]
     })
@@ -30,7 +30,12 @@ describe('', function () {
         expect(handlersSpy).toHaveBeenCalledWith(assertedEvent)
       })
     });
-
+    describe('when getting aggregate values', function () {
+      it('should return the proper state after processing events', () => {
+        aggregate.updateStateFromEvents(events)
+        expect(aggregate.sentence).toEqual('Hello World from Spain!')
+      })
+    });
   });
 });
 
@@ -42,10 +47,12 @@ interface EventV2Data extends EventV1Data {
   position: number
 }
 
+
 @EventArtisan.Event({type: 'MyTestEvent', version: 2})
 class EventV2 extends SourceEvent<EventV2Data> {
   upcast(event: EventV1): EventV2 {
-    this.fromStoredData({...event, data: {word: event.data.word, position: -1}})
+    const eventData: EventV2Data = {word: event.data.word, position: -1}
+    this.fromRawData(eventData, {})
     return this
   }
 }
@@ -67,7 +74,7 @@ class MyAggregate extends AggregateRoot {
   myEventHandler(event: StoredEvent<EventV2Data>): void {
     const word = event.data.word
     const position = event.data.position === -1 ? this.wordsArray.length : event.data.position
-    this.wordsArray = this.wordsArray.splice(position, 0, word)
+    this.wordsArray.splice(position, 0, word)
   }
 }
 

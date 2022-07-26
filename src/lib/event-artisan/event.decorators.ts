@@ -1,6 +1,6 @@
 import {EventCraftingManifest, Upcaster} from "./event.types";
 import {SourceEvent} from "./source-event.class";
-import {Type} from "@doesrobbiedream/ts-utils";
+import {ExtractFromType, Type} from "@doesrobbiedream/ts-utils";
 
 export enum EventDecoratedKeys {
   Type = 'Type',
@@ -16,8 +16,8 @@ export function EventDecoratorFactory(manifest: EventCraftingManifest) {
   }
 }
 
-export function LegacyEventDecoratorFactory(upcaster: Type<Upcaster>) {
-  return function (target: Type<SourceEvent<unknown, unknown>>) {
+export function LegacyEventDecoratorFactory<Event>(upcaster: Type<Upcaster<ExtractFromType<Event>>>) {
+  return function (target: Event) {
     Reflect.defineMetadata(EventDecoratedKeys.Target, upcaster, target)
     Reflect.defineMetadata(EventDecoratedKeys.IsLegacy, true, target)
   }

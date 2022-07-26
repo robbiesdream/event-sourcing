@@ -14,8 +14,8 @@ export interface StoredEventContents<Data, Meta> {
   meta: Meta
 }
 
-export interface Upcaster<L = unknown> {
-  upcast(event: L): this
+export interface Upcaster<L = unknown, T = undefined> {
+  upcast(event: L): T | this
 }
 
 export type StoredEvent<Data = unknown, Meta = unknown> =
