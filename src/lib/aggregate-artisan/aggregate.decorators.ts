@@ -69,7 +69,6 @@ function validateProcessableEvents(events: Array<Type<SourceEvent>>): { valid: b
       message: `An event handler can only process one event type. Types: [${types.join(', ')}] were provided.`
     }
   }
-  
   // Should only have ONE non-legacy event
   const nonLegacyEvents = events.filter(eventType => !LegacyEvent.isLegacy(eventType))
   if (nonLegacyEvents.length !== 1) {
