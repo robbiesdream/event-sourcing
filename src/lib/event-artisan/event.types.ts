@@ -1,5 +1,4 @@
 export type EmptyObject = { [key: string]: never }
-export type UnknownObject = { [key: string]: unknown }
 
 export interface StoredEventBaseData {
   id: string

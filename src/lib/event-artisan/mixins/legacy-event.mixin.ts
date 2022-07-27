@@ -4,7 +4,10 @@ import {EventDecoratedKeys} from "../event.decorators";
 
 export class LegacyEvent {
   public static isLegacy(event: unknown): event is LegacyEvent {
-    return Boolean(Reflect.getMetadata(EventDecoratedKeys.IsLegacy, event.constructor))
+    const typeChecker = Boolean(Reflect.getMetadata(EventDecoratedKeys.IsLegacy, event.constructor))
+    const instanceChecker = Boolean(Reflect.getMetadata(EventDecoratedKeys.IsLegacy, event))
+
+    return typeChecker || instanceChecker
   }
 
   public lift(upcastToVersion?: number) {

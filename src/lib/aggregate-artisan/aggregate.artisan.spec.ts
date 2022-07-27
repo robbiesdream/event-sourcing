@@ -1,6 +1,6 @@
 import {SourceEvent} from "../event-artisan/source-event.class";
 import {AggregateArtisan} from "./aggregate.artisan";
-import {StoredEvent} from "../event-artisan/event.types";
+import {StoredEvent, Upcaster} from "../event-artisan/event.types";
 import {EventArtisan} from "@doesrobbiedream/event-sourcing";
 import {AggregateRoot} from "./aggregate-root.class";
 
@@ -16,7 +16,7 @@ describe('', function () {
         createEventFromData<EventV2>('MyTestEvent', 2, {word: 'World', position: 1}, {})
       ]
     })
-    describe('when crafting an event handler', function () {
+    describe('and crafting an event handler', function () {
       it('should maintain method names', () => {
         expect(aggregate).toHaveProperty('myEventHandler')
       })
@@ -30,13 +30,26 @@ describe('', function () {
         expect(handlersSpy).toHaveBeenCalledWith(assertedEvent)
       })
     });
-    describe('when getting aggregate values', function () {
+    describe('and getting aggregate values', function () {
       it('should return the proper state after processing events', () => {
         aggregate.updateStateFromEvents(events)
         expect(aggregate.sentence).toEqual('Hello World from Spain!')
       })
     });
+    describe('and it has invalid handlers', function () {
+      it('should throw an error when different event types are provided', function () {
+        const decoratorExecutor = () => AggregateArtisan.EventHandler([EventV1, EventV2, NonLegacyEvent])
+        const expectedMessage = 'An event handler can only process one event type. Types: [MyTestEvent, NonLegacyEvent] were provided.'
+        expect(decoratorExecutor).toThrow(expectedMessage)
+      })
+      it('should throw an error when more than one non-legacy event is provided', function () {
+        const decoratorExecutor = () => AggregateArtisan.EventHandler([EventV1, EventV2, EventV3])
+        const expectedMessage = 'An event handler should only have one non-legacy event. The following [EventV2, EventV3] are non-legacy.'
+        expect(decoratorExecutor).toThrow(expectedMessage)
+      })
+    });
   });
+
 });
 
 interface EventV1Data {
@@ -47,9 +60,24 @@ interface EventV2Data extends EventV1Data {
   position: number
 }
 
+@EventArtisan.Event({
+  type: 'NonLegacyEvent',
+  version: 1
+})
+class NonLegacyEvent extends SourceEvent {
+}
+
+@EventArtisan.Event({type: 'MyTestEvent', version: 3})
+class EventV3 extends SourceEvent<EventV2Data> implements Upcaster<EventV1, EventV2> {
+  upcast(event: EventV1): EventV2 {
+    const eventData: EventV2Data = {word: event.data.word, position: -1}
+    this.fromRawData(eventData, {})
+    return this
+  }
+}
 
 @EventArtisan.Event({type: 'MyTestEvent', version: 2})
-class EventV2 extends SourceEvent<EventV2Data> {
+class EventV2 extends SourceEvent<EventV2Data> implements Upcaster<EventV1, EventV2> {
   upcast(event: EventV1): EventV2 {
     const eventData: EventV2Data = {word: event.data.word, position: -1}
     this.fromRawData(eventData, {})
