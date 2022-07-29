@@ -3,14 +3,15 @@ import {Type} from "@doesrobbiedream/ts-utils";
 import {Projection} from "./projection.class";
 import {EventDecoratedKeys} from "../event-artisan/event.decorators";
 import {StoredEvent} from "../event-artisan/event.types";
-import {Projector} from "./projector.class";
+import {ExtractProjectionType, Projector} from "./projector.class";
 
 export enum ProjectionDecoratedKeys {
+  ProjectionType = 'ProjectionType',
   ProjectorFetchers = 'ProjectorFetchers',
   ProjectionEventHandlers = 'ProjectionEventHandlers'
 }
 
-type ProjectionFetcher<P extends Projection> = (event: StoredEvent) => Promise<P[]>
+type ProjectionFetcher<P extends Projection> = (event: StoredEvent) => Promise<ExtractProjectionType<P>[]>
 type EventProjectorMethod = (event) => void
 export type EventType = string
 export type MethodKey = string
@@ -23,7 +24,7 @@ export interface ProjectorHandlersManifest {
 export function ProjectionAcquirerDecorator<P extends Projection>(events: Array<Type<SourceEvent>>) {
   return (target: Projector<P>, propertyKey: MethodKey, _: TypedPropertyDescriptor<ProjectionFetcher<P>>) => {
     const handlers: Map<EventType, ProjectorHandlersManifest> = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectorFetchers, target.constructor) || new Map()
-    
+
     events.forEach(event => {
       const type = Reflect.getMetadata(EventDecoratedKeys.Type, event)
       const version = Reflect.getMetadata(EventDecoratedKeys.Version, event)
@@ -36,7 +37,7 @@ export function ProjectionAcquirerDecorator<P extends Projection>(events: Array<
 
 export function EventApplierDecorator<T extends SourceEvent>(events: Array<Type<T>>) {
   return (target: Projection, propertyKey: MethodKey, descriptor: TypedPropertyDescriptor<EventProjectorMethod>) => {
-    const handlers: Map<EventType, ProjectorHandlersManifest> = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectionEventHandlers, target.constructor) || new Map()
+    const handlers: Map<EventType, ProjectorHandlersManifest> = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectionEventHandlers, target) || new Map()
 
     events.forEach(event => {
       const type = Reflect.getMetadata(EventDecoratedKeys.Type, event)
@@ -59,5 +60,11 @@ export function EventApplierDecorator<T extends SourceEvent>(events: Array<Type<
     return {
       value: newHandler
     }
+  }
+}
+
+export function ProjectorDecorator<P extends Projection>(projection: Type<P>) {
+  return (target: Type<Projector<P>>) => {
+    Reflect.defineMetadata(ProjectionDecoratedKeys.ProjectionType, projection, target)
   }
 }

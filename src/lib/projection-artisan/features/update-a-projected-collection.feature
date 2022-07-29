@@ -7,6 +7,6 @@ Feature: Update a projected collection from events
 
 
   Scenario: Update a projection with a specific sequence of events
-    Given a persisted collection of numbers
-    When a multiple operations event are fired
+    Given a projection of numbers
+    When multiple operations events are fired
     Then all operations shall be executed in the correct order
