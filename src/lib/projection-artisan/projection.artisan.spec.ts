@@ -7,6 +7,11 @@ import uniq from 'lodash-es/uniq'
 import {SourceEvent} from "../event-artisan/source-event.class";
 import {EventArtisan} from "@doesrobbiedream/event-sourcing";
 
+
+type DataFromStoredEvent<T extends StoredEvent> = T extends StoredEvent<infer Data> ? Data : never
+type TypeFromStoredEvent<T extends StoredEvent> = T['type']
+
+
 describe(ProjectionArtisan.name, function () {
 
   /*
@@ -96,7 +101,6 @@ describe(ProjectionArtisan.name, function () {
     });
   })
 
-
   /*
   *
   * Feature: Update a projected collection from events [updated-a-projected-collection.feature]
@@ -109,9 +113,9 @@ describe(ProjectionArtisan.name, function () {
   *
   * 1 - Add 9
   * 2 - Divide by 3
-  * 3 - Add 2
+  * 3 - Add 3
   *
-  * The expected outcome shall be 5 instead of 11/3
+  * The expected outcome shall be 6 instead of 4
   *
   * In order to ensure order, when dividing,
   * the fetcher will have a delay that would prevent false positive preventing race conditions
@@ -228,11 +232,7 @@ describe(ProjectionArtisan.name, function () {
 
 })
 
-type DataFromStoredEvent<T extends StoredEvent> = T extends StoredEvent<infer Data> ? Data : never
-type TypeFromStoredEvent<T extends StoredEvent> = T['type']
-
 function createEventFromData<T extends StoredEvent>(type: TypeFromStoredEvent<T>, version: number, data: DataFromStoredEvent<T>): T {
-
   return {
     id: 'abcd-1234',
     type,
