@@ -1,6 +1,7 @@
 import {MixinArtisan, Type} from "@doesrobbiedream/ts-utils";
 import {Upcaster} from "../event.types";
 import {EventDecoratedKeys} from "../event.decorators";
+import {SourceEvent} from "../source-event.class";
 
 export class LegacyEvent {
   public static isLegacy(event: unknown): event is LegacyEvent {
@@ -10,16 +11,16 @@ export class LegacyEvent {
     return typeChecker || instanceChecker
   }
 
-  public lift(upcastToVersion?: number) {
+  public lift(upcastToVersion?: number): SourceEvent {
     if (!LegacyEvent.isLegacy(this)) {
       return this
     }
 
-    const targetConstructor: Type<Upcaster<this>> = Reflect.getMetadata(EventDecoratedKeys.Target, this.constructor)
+    const targetConstructor: Type<Upcaster<SourceEvent>> = Reflect.getMetadata(EventDecoratedKeys.Target, this.constructor)
 
     const targetVersion = Reflect.getMetadata(EventDecoratedKeys.Version, targetConstructor)
 
-    const targetEvent = new targetConstructor().upcast(this)
+    const targetEvent: SourceEvent = new targetConstructor().upcast(this as unknown as SourceEvent)
 
     if ((typeof upcastToVersion === 'number' && upcastToVersion === targetVersion) || !LegacyEvent.isLegacy(targetEvent)) {
       return targetEvent

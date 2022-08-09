@@ -1,101 +1,145 @@
 import {Projection} from "./projection.class";
 import {StoredEvent} from "../event-artisan/event.types";
-import {
-  asyncScheduler,
-  BehaviorSubject,
-  filter,
-  from,
-  map,
-  merge,
-  mergeMap,
-  Observable,
-  Subject,
-  Subscription,
-  tap
-} from "rxjs";
+import {filter, Observable, Subject, take, tap} from "rxjs";
 import cloneDeep from 'lodash-es/cloneDeep'
-import {ProjectionDecoratedKeys} from "./projection.decorators";
-import {SourceEvent} from "../event-artisan/source-event.class";
+import {
+  ProjectionDecoratedKeys,
+  ProjectorEventHandlerManifest,
+  ProjectorHandlerManifest
+} from "./projection.decorators";
 import {Type} from "@doesrobbiedream/ts-utils";
+import {SourceEvent} from "../event-artisan/source-event.class";
+import {Queue} from "queue-typescript";
 
 
 export type ExtractProjectionType<P> = P extends Projection<infer T> ? T : never
 
-interface AppliedToProjectionManifest<P extends Projection> {
+interface EventApplicationManifest<P extends Projection> {
   event: StoredEvent
   initial: ExtractProjectionType<P>[]
-  result: ExtractProjectionType<P>[]
+  projected: ExtractProjectionType<P>[]
+}
+
+export class EventsQueueFinisher extends Subject<void> {
+
 }
 
 export abstract class Projector<P extends Projection> {
-  private subscription: Subscription;
-  private _stream: Observable<StoredEvent>
-  private _streams$: BehaviorSubject<Set<Observable<StoredEvent>>> = new BehaviorSubject(new Set())
-  private _eventPipelineDispatcher$: Subject<void> = new Subject()
-  private eventsQueue: StoredEvent[] = []
-  private projectionChangesHandler: Subject<AppliedToProjectionManifest<P>> = new Subject()
-  private pipelineIsFree = true
+
+  protected _appliedEvent$: Subject<EventApplicationManifest<P>> = new Subject()
+  protected _stream$: Subject<StoredEvent> = new Subject()
+  protected _tick$: Subject<void> = new Subject<void>()
+
+  protected processing = false
+
+  protected activeQueue: Queue<StoredEvent | EventsQueueFinisher>
+  protected queues: Queue<Queue<StoredEvent | EventsQueueFinisher>> = new Queue<Queue<StoredEvent | EventsQueueFinisher>>()
+
+  private readonly eventAppliersManifests: Map<string, ProjectorEventHandlerManifest>
+  private readonly afterEventManifests: Map<string, ProjectorEventHandlerManifest>
+  private readonly afterEachManifest: ProjectorHandlerManifest
+  private readonly projectionClass: Type<Projection>
 
   constructor() {
-    this._streams$.subscribe((streamsSet) => this.stream = merge(...Array.from(streamsSet.values())))
-    this._eventPipelineDispatcher$.pipe(
-      filter(() => {
-        return this.pipelineIsFree
-      }),
-      tap(() => {
-        this.pipelineIsFree = false
-      }),
-      map(() => {
-        return this.eventsQueue.shift()
-      }),
-      filter((event) => {
-        return !!event
-      }),
-      mergeMap(event => from(this.processIncomingEvent(event))
-        .pipe(
-          map(({initial, result}) => ({event, initial, result}))
-        )
-      )
-    ).subscribe((manifest) => this.projectionChangesHandler.next(manifest))
+    // Reflected Data
+    this.eventAppliersManifests = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectorFetchers, this) || new Map()
+    this.afterEventManifests = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectionAfterEventCallback, this) || new Map()
+    this.afterEachManifest = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectionAfterEachEventCallback, this)
+    this.projectionClass = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectionType, this.constructor)
+    this.connectEventsStream()
   }
 
-  public attachStream(stream: Observable<StoredEvent>) {
-    if (this.subscription) this.subscription.unsubscribe()
-    this._streams$.next(this._streams$.getValue().add(stream))
-  }
-
-  get eventApplied(): Observable<AppliedToProjectionManifest<P>> {
-    return this.projectionChangesHandler.asObservable()
-  }
-
-  private set stream(stream: Observable<StoredEvent>) {
-    if (this.subscription) this.subscription.unsubscribe()
-    this._stream = stream
-    this.subscription = this._stream.subscribe((event) => {
-      this.eventsQueue.push(event)
-      this._eventPipelineDispatcher$.next()
+  public attachStream(stream: Observable<StoredEvent>){
+    const afterEach = new Subject<StoredEvent>()
+    stream.subscribe((event) => {
+      const finisher = new EventsQueueFinisher()
+      this.queues.enqueue(new Queue<StoredEvent | EventsQueueFinisher>(event, finisher))
+      finisher.subscribe({complete: () => afterEach.next(event)})
+      this._tick$.next()
     })
+    return {
+      afterEach: afterEach.pipe(take(1))
+    }
   }
 
-  private async processIncomingEvent(event: StoredEvent): Promise<Pick<AppliedToProjectionManifest<P>, 'initial' | 'result'>> {
-    const handlersSet: Map<string, { handler: string, eventClass: Type<SourceEvent> }> = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectorFetchers, this)
-    const ReflectedProjection: Type<Projection> = Reflect.getMetadata(ProjectionDecoratedKeys.ProjectionType, this.constructor)
+  public process(events: Array<StoredEvent>) {
+    const finisher = new EventsQueueFinisher()
+    this.queues.enqueue(new Queue<StoredEvent | EventsQueueFinisher>(...events, finisher))
+    this._tick$.next()
+    return {
+      onFinished: finisher.pipe(take(1))
+    }
+  }
 
-    if (!handlersSet.has(`${event.type}@${event.version}`)) {
+  private connectEventsStream() {
+    this._stream$
+      .pipe(
+        tap(() => this.processing = true)
+      )
+      .subscribe(async (event) => {
+        const initial = await this.fetchCurrentState(event)
+        const projected = await this.applyEvent(event, initial);
+        await this.applyAfterEvent(event, projected)
+        await this.applyAfterEach(projected)
+        this._appliedEvent$.next({initial, projected, event})
+        this.processing = false
+        this._tick$.next()
+      })
+
+    this._tick$.pipe(filter(() => !this.processing)).subscribe(() => this.next())
+  }
+
+  private next() {
+    if (!this.activeQueue || this.activeQueue.length === 0) {
+      this.nextQueue()
+      return
+    }
+    if (this.activeQueue.front instanceof EventsQueueFinisher) {
+      const finisher: EventsQueueFinisher = this.activeQueue.dequeue() as EventsQueueFinisher
+      finisher.next()
+      finisher.complete()
+      return
+    }
+    const nextEvent: StoredEvent = this.activeQueue.dequeue() as StoredEvent
+    this._stream$.next(nextEvent)
+  }
+
+  private nextQueue() {
+    if (this.queues.length) {
+      this.activeQueue = this.queues.dequeue()
+      this._tick$.next()
+    }
+  }
+
+  private async fetchCurrentState(event: StoredEvent) {
+    const eventIndex = SourceEvent.getIndexFromStored(event)
+    if (!this.eventAppliersManifests.has(eventIndex)) {
       throw Error(`Event ${event.type}@${event.version} has no fetchers to acquire current projections. Please, define a handler using @ProjectionFetcher decorator`)
     }
-    const handlerKey = handlersSet.get(`${event.type}@${event.version}`).handler
-
-    const projections: ExtractProjectionType<P>[] = await this[handlerKey](event)
-
-    const resultProjections = cloneDeep(projections).map(projection => new ReflectedProjection(projection))
-    const result = resultProjections.map((p: Projection) => p.apply(event).serialize())
-    asyncScheduler.schedule(() => this.releasePipeline(), 0)
-    return {initial: projections, result}
+    const {handlerKey: eventApplierKey} = this.eventAppliersManifests.get(eventIndex)
+    return await this[eventApplierKey](event)
   }
 
-  private releasePipeline() {
-    this.pipelineIsFree = true
-    this._eventPipelineDispatcher$.next()
+  private async applyEvent(event: StoredEvent, initial: Array<ExtractProjectionType<P>>) {
+    const projections = cloneDeep(initial).map(projection => new this.projectionClass(projection))
+    const resultsMapper: (p: Projection) => Promise<unknown> = (p) => p.apply(event).then(projection => projection.serialize())
+    return await Promise.all(projections.map(resultsMapper))
   }
+
+  private async applyAfterEvent(event: StoredEvent, projections: Array<ExtractProjectionType<P>>) {
+    const eventIndex = SourceEvent.getIndexFromStored(event)
+    if (this.afterEventManifests.has(eventIndex)) {
+      const {handlerKey: afterEventHandler} = this.afterEventManifests.get(eventIndex)
+      await this[afterEventHandler](projections)
+    }
+  }
+
+  private async applyAfterEach(projections: Array<ExtractProjectionType<P>>) {
+    if (this.afterEachManifest) {
+      const {handlerKey: afterEachEventHandler} = this.afterEachManifest
+      await this[afterEachEventHandler](projections)
+    }
+  }
+
+
 }

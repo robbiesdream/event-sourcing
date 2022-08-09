@@ -1,3 +1,5 @@
+import {SourceEvent} from "./source-event.class";
+
 export type EmptyObject = { [key: string]: never }
 
 export interface StoredEventBaseData {
@@ -13,8 +15,8 @@ export interface StoredEventContents<Data, Meta> {
   meta: Meta
 }
 
-export interface Upcaster<L = unknown, T = undefined> {
-  upcast(event: L): T | this
+export interface Upcaster<L extends SourceEvent = SourceEvent, T extends SourceEvent = SourceEvent> {
+  upcast(event: L): T
 }
 
 export type StoredEvent<Data = unknown, Meta = unknown> =

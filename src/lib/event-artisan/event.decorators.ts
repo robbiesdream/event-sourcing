@@ -16,7 +16,7 @@ export function EventDecoratorFactory(manifest: EventCraftingManifest) {
   }
 }
 
-export function LegacyEventDecoratorFactory<Event>(upcaster: Type<Upcaster<ExtractFromType<Event>>>) {
+export function LegacyEventDecoratorFactory<Event extends Type<SourceEvent> = Type<SourceEvent>>(upcaster: Type<Upcaster<ExtractFromType<Event>>>) {
   return function (target: Event) {
     Reflect.defineMetadata(EventDecoratedKeys.Target, upcaster, target)
     Reflect.defineMetadata(EventDecoratedKeys.IsLegacy, true, target)
