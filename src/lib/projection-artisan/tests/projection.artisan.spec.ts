@@ -1,29 +1,13 @@
-import {ProjectionArtisan} from "./projection.artisan";
+import {ProjectionArtisan} from "../projection.artisan";
 import {filter, Subject, switchMap} from "rxjs";
-import {StoredEvent, Upcaster} from "../event-artisan/event.types";
-import {Projector} from "./projector.class";
-import {Projection} from "./projection.class";
-import {SourceEvent} from "../event-artisan/source-event.class";
-import {EventArtisan} from "../event-artisan/event.artisan";
-import {MockDB} from "./tests/mocked-db";
+import {StoredEvent, Upcaster} from "../../event-artisan/event.types";
+import {Projector} from "../projector.class";
+import {Projection} from "../projection.class";
+import {SourceEvent} from "../../event-artisan/source-event.class";
+import {EventArtisan} from "../../event-artisan/event.artisan";
+import {MockDB} from "./mocked-db";
 import {randomUUID} from "crypto";
-
-
-type DataFromStoredEvent<T extends StoredEvent> = T extends StoredEvent<infer Data> ? Data : never
-type TypeFromStoredEvent<T extends StoredEvent> = T['type']
-
-function createEventFromData<T extends StoredEvent>(type: TypeFromStoredEvent<T>, version: number, data: DataFromStoredEvent<T>, overwrite: Record<string, unknown> = {}): T {
-  return {
-    id: randomUUID(),
-    type,
-    data,
-    updatedAt: new Date(Date.now()),
-    createdAt: new Date(Date.now()),
-    meta: {},
-    version,
-    ...overwrite
-  } as T
-}
+import {createEventFromData, DataFromStoredEvent} from "./utils";
 
 
 describe(ProjectionArtisan.name, function () {
@@ -377,143 +361,6 @@ describe(ProjectionArtisan.name, function () {
       });
     });
   });
-
-  describe.skip('Stressing the system', () => {
-    const ProjectionsDB = new MockDB()
-    let processed = 0
-
-    interface SomeEventWithTonsOfDataData {
-      some: string
-      of: string
-      my: string
-      trousers: string
-      dont: string
-      have: string
-      the: string
-      proper: string
-      size: string
-    }
-
-    @EventArtisan.Event({
-      type: 'SomeEventWithTonsOfData',
-      version: 1
-    })
-    class SomeEventWithTonsOfData extends SourceEvent<SomeEventWithTonsOfDataData> {
-    }
-
-    interface SomeVersionedEventV1Data {
-      iAmAnOldProperty: string
-    }
-
-    interface SomeVersionedEventV2Data {
-      iAmTheNewProperty: string
-    }
-
-    @EventArtisan.Event({
-      type: 'SomeVersionedEvent',
-      version: 2
-    })
-    class SomeVersionedEventV2 extends SourceEvent<SomeVersionedEventV2Data> implements Upcaster<SomeVersionedEventV1> {
-      upcast(event: SomeVersionedEventV1) {
-        const data: SomeVersionedEventV2Data = {iAmTheNewProperty: event.data.iAmAnOldProperty}
-        this.fromStoredData({...event, data})
-      }
-    }
-
-    @EventArtisan.LegacyOf(SomeVersionedEventV2)
-    @EventArtisan.Event({
-      type: 'SomeVersionedEvent',
-      version: 1
-    })
-    class SomeVersionedEventV1 extends SourceEvent<SomeVersionedEventV1Data> {
-    }
-
-
-    class TheAnyProjection extends Projection {
-      id: string
-
-      @ProjectionArtisan.EventApplier([SomeVersionedEventV1, SomeVersionedEventV2, SomeEventWithTonsOfData])
-      async anyEventApplier(event: StoredEvent) {
-        this.id = event.id
-      }
-    }
-
-    @ProjectionArtisan.Projector(TheAnyProjection)
-    class TheAnyProjector extends Projector<TheAnyProjection> {
-
-      @ProjectionArtisan.AfterEach()
-      async save(projection: TheAnyProjection[]) {
-        if(processed % 10 === 0){
-          console.log(processed)
-        }
-        await ProjectionsDB.saveAll(projection)
-        processed++
-      }
-
-      @ProjectionArtisan.ProjectionAcquirer([SomeVersionedEventV1, SomeVersionedEventV2, SomeEventWithTonsOfData])
-      async noopFetcher() {
-        return new Promise<[Record<string, never>]>(resolve => {
-          setTimeout(
-            () => {
-              resolve([{}])
-            },
-            Math.floor(Math.random() * 100)
-          )
-        })
-      }
-    }
-
-    describe('when processing huge amounts of events', () => {
-      jest.setTimeout(1000000)
-      const stressRatio = 1000
-      let projector: TheAnyProjector
-      let events: StoredEvent[]
-      beforeAll(() => {
-        events = Array.from({length: stressRatio}).reduce<StoredEvent[]>((results, _, index) => {
-          const tonsOfData: SomeEventWithTonsOfDataData = {
-            some: String(index + 1),
-            of: String(index + 1),
-            my: String(index + 1),
-            trousers: String(index + 1),
-            dont: String(index + 1),
-            have: String(index + 1),
-            the: String(index + 1),
-            proper: String(index + 1),
-            size: String(index + 1),
-          }
-          const versionDataV1: SomeVersionedEventV1Data = {
-            iAmAnOldProperty: 'Hello'
-          }
-          const versionDataV2: SomeVersionedEventV2Data = {
-            iAmTheNewProperty: 'World!'
-          }
-          const events = [
-            createEventFromData<SomeEventWithTonsOfData>('SomeEventWithTonsOfData', 1, tonsOfData),
-            createEventFromData<SomeEventWithTonsOfData>('SomeEventWithTonsOfData', 1, tonsOfData),
-            createEventFromData<SomeEventWithTonsOfData>('SomeEventWithTonsOfData', 1, tonsOfData),
-            createEventFromData<SomeEventWithTonsOfData>('SomeEventWithTonsOfData', 1, tonsOfData),
-            createEventFromData<SomeEventWithTonsOfData>('SomeEventWithTonsOfData', 1, tonsOfData),
-            createEventFromData<SomeVersionedEventV1>('SomeVersionedEvent', 1, versionDataV1),
-            createEventFromData<SomeVersionedEventV1>('SomeVersionedEvent', 1, versionDataV1),
-            createEventFromData<SomeVersionedEventV1>('SomeVersionedEvent', 1, versionDataV1),
-            createEventFromData<SomeVersionedEventV2>('SomeVersionedEvent', 2, versionDataV2),
-            createEventFromData<SomeVersionedEventV2>('SomeVersionedEvent', 2, versionDataV2)
-          ]
-
-          return [...results, ...events]
-        }, [])
-        projector = new TheAnyProjector()
-      })
-      it('should process in an acceptable time period', (done) => {
-        projector.process(events).onFinished.subscribe(async () => {
-          const results = await ProjectionsDB.get()
-          expect(results).toHaveLength(stressRatio * 10)
-          done()
-        })
-      })
-    })
-
-  })
 })
 
 
