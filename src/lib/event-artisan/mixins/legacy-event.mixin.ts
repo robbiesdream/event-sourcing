@@ -16,11 +16,12 @@ export class LegacyEvent {
       return this
     }
 
-    const targetConstructor: Type<Upcaster<SourceEvent>> = Reflect.getMetadata(EventDecoratedKeys.Target, this.constructor)
+    const targetConstructor: Type<SourceEvent & Upcaster> = Reflect.getMetadata(EventDecoratedKeys.Target, this.constructor)
 
     const targetVersion = Reflect.getMetadata(EventDecoratedKeys.Version, targetConstructor)
 
-    const targetEvent: SourceEvent = new targetConstructor().upcast(this as unknown as SourceEvent)
+    const targetEvent: SourceEvent & Upcaster = new targetConstructor()
+    targetEvent.upcast(this as unknown as SourceEvent)
 
     if ((typeof upcastToVersion === 'number' && upcastToVersion === targetVersion) || !LegacyEvent.isLegacy(targetEvent)) {
       return targetEvent

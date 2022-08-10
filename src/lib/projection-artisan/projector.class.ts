@@ -64,7 +64,10 @@ export abstract class Projector<P extends Projection> {
 
   public process(events: Array<StoredEvent>) {
     const finisher = new EventsQueueFinisher()
-    this.queues.enqueue(new Queue<StoredEvent | EventsQueueFinisher>(...events, finisher))
+    const queue = new Queue<StoredEvent | EventsQueueFinisher>()
+    events.forEach(e => queue.enqueue(e))
+    queue.enqueue(finisher)
+    this.queues.enqueue(queue)
     this._tick$.next()
     return {
       onFinished: finisher.pipe(take(1))
